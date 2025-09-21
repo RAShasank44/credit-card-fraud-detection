@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # ===============================
 @st.cache_resource
 def load_model():
-    return joblib.load("data/processed/xgb_fraud_model.pkl")  # path in repo
+    return joblib.load("xgb_fraud_model.pkl")  # path in repo
 
 model = load_model()
 
