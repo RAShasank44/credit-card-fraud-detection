@@ -57,23 +57,30 @@ with tab1:
 with tab2:
     st.subheader("Upload CSV for Bulk Prediction")
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+        st.write("Preview of uploaded data:", df.head())
 
-        # Drop target if exists
+        # Drop target column if exists
         if 'Class' in df.columns:
-            df = df.drop('Class', axis=1)
+            X_input = df.drop('Class', axis=1)
+        else:
+            X_input = df.copy()
 
-        # Add missing columns and reorder
-        for col in expected_features:
-            if col not in df.columns:
-                df[col] = 0
-        df = df[expected_features]
+        try:
+            preds = model.predict(X_input)
+            df['Prediction'] = preds
+            st.write("Prediction Results:")
+            st.dataframe(df)
 
-        preds = model.predict(df)
-        df['Prediction'] = preds
-        st.write("Predictions:")
-        st.dataframe(df)
+            # Download predictions
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download Predictions CSV", data=csv, file_name="predictions.csv", mime="text/csv")
 
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Predictions CSV", data=csv, file_name="predictions.csv", mime="text/csv")
+            # Optional bar chart
+            summary = df['Prediction'].value_counts()
+            st.bar_chart(summary)
+
+        except Exception as e:
+            st.error(f"❌ Error during prediction: {e}")
