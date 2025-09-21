@@ -7,9 +7,7 @@ import os
 st.set_page_config(page_title="Credit Card Fraud Detection", layout="centered")
 st.title("💳 Credit Card Fraud Detection (Flexible Input)")
 
-# ===============================
 # Load Model with Error Handling
-# ===============================
 @st.cache_resource
 def load_model(path="xgb_fraud_model.pkl"):
     if not os.path.exists(path):
@@ -24,14 +22,11 @@ if model is None:
 # Get model expected feature names
 expected_features = model.get_booster().feature_names
 
-# ===============================
+
 # Tabs for Single & Bulk Prediction
-# ===============================
 tab1, tab2 = st.tabs(["🔹 Single Transaction", "📂 Bulk CSV Prediction"])
 
-# ---------------------------
 # Single Transaction Prediction
-# ---------------------------
 with tab1:
     st.subheader("Manual Transaction Input")
 
@@ -51,9 +46,8 @@ with tab1:
         pred = model.predict(input_df)[0]
         st.success(f"Prediction: {'🚨 Fraud' if pred==1 else '✅ Normal'}")
 
-# ---------------------------
+
 # Bulk CSV Prediction
-# ---------------------------
 with tab2:
     st.subheader("Upload CSV for Bulk Prediction")
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
@@ -78,7 +72,7 @@ with tab2:
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("Download Predictions CSV", data=csv, file_name="predictions.csv", mime="text/csv")
 
-            # Optional bar chart
+            # bar chart
             summary = df['Prediction'].value_counts()
             st.bar_chart(summary)
 
