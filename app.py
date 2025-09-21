@@ -2,21 +2,27 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import shap
-import matplotlib.pyplot as plt
-
-# ===============================
-# Load Model
-# ===============================
-@st.cache_resource
-def load_model():
-    return joblib.load("xgb_fraud_model.pkl")  # path in repo
-
-model = load_model()
+import os
 
 st.set_page_config(page_title="Credit Card Fraud Detection", layout="centered")
-st.title("💳 Credit Card Fraud Detection")
-st.write("Predict whether a credit card transaction is **Fraudulent (1)** or **Normal (0)**.")
+st.title("💳 Credit Card Fraud Detection (Flexible Input)")
+
+# ===============================
+# Load Model with Error Handling
+# ===============================
+@st.cache_resource
+def load_model(path="xgb_fraud_model.pkl"):
+    if not os.path.exists(path):
+        st.error(f"❌ Model file not found at `{path}`")
+        return None
+    return joblib.load(path)
+
+model = load_model()
+if model is None:
+    st.stop()
+
+# Get model expected feature names
+expected_features = model.get_booster().feature_names
 
 # ===============================
 # Tabs for Single & Bulk Prediction
@@ -29,33 +35,21 @@ tab1, tab2 = st.tabs(["🔹 Single Transaction", "📂 Bulk CSV Prediction"])
 with tab1:
     st.subheader("Manual Transaction Input")
 
-    # Input fields for demo (you can extend to all 30 features)
-    time = st.number_input("Time", value=1000.0)
-    amount = st.number_input("Amount", value=100.0)
-    v1 = st.number_input("V1", value=0.0)
-    v2 = st.number_input("V2", value=0.0)
-    v3 = st.number_input("V3", value=0.0)
-    v4 = st.number_input("V4", value=0.0)
-    v5 = st.number_input("V5", value=0.0)
+    user_input = {}
+    for feat in expected_features:
+        user_input[feat] = st.number_input(feat, value=0.0)
 
-    features = pd.DataFrame([[time, v1, v2, v3, v4, v5, amount]],
-                            columns=["Time", "V1", "V2", "V3", "V4", "V5", "Amount"])
+    input_df = pd.DataFrame([user_input])
 
     if st.button("Predict Transaction"):
-        pred = model.predict(features)[0]
-        st.success(f"Prediction: {'🚨 Fraud' if pred==1 else '✅ Normal'}")
+        # Align features
+        for col in expected_features:
+            if col not in input_df.columns:
+                input_df[col] = 0
+        input_df = input_df[expected_features]
 
-        # Optional: SHAP explanation
-        try:
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(features)
-            st.subheader("Feature Importance (SHAP)")
-            shap.initjs()
-            plt.figure()
-            shap.summary_plot(shap_values, features, plot_type="bar", show=False)
-            st.pyplot(plt)
-        except Exception as e:
-            st.warning("SHAP explanation not available.")
+        pred = model.predict(input_df)[0]
+        st.success(f"Prediction: {'🚨 Fraud' if pred==1 else '✅ Normal'}")
 
 # ---------------------------
 # Bulk CSV Prediction
@@ -63,27 +57,23 @@ with tab1:
 with tab2:
     st.subheader("Upload CSV for Bulk Prediction")
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
-
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
-        st.write("Preview of uploaded data:", df.head())
 
-        # ✅ Drop Class column if it exists
+        # Drop target if exists
         if 'Class' in df.columns:
-            X_input = df.drop('Class', axis=1)
-        else:
-            X_input = df.copy()
+            df = df.drop('Class', axis=1)
 
-        # Make predictions
-        preds = model.predict(X_input)
+        # Add missing columns and reorder
+        for col in expected_features:
+            if col not in df.columns:
+                df[col] = 0
+        df = df[expected_features]
+
+        preds = model.predict(df)
         df['Prediction'] = preds
-        st.write("Prediction Results:")
+        st.write("Predictions:")
         st.dataframe(df)
 
-        # Download button
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("Download Predictions CSV", data=csv, file_name="predictions.csv", mime="text/csv")
-
-        # Optional: simple bar chart of predictions
-        summary = df['Prediction'].value_counts()
-        st.bar_chart(summary)
